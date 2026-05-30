@@ -260,9 +260,11 @@ def compare_summaries(workday: pd.DataFrame, toast: pd.DataFrame) -> pd.DataFram
                     "Employee ID": uid,
                     "Employee Name": display_name,
                     "Field": field,
+                    "Workday Value": round(left_num, 2),
+                    "Payroll Export Value": round(right_num, 2),
                 })
 
-    return pd.DataFrame(rows, columns=["Employee ID", "Employee Name", "Field"])
+    return pd.DataFrame(rows, columns=["Employee ID", "Employee Name", "Field", "Workday Value", "Payroll Export Value"])
 
 
 def invalid_id_report(workday_invalid: pd.DataFrame, toast_invalid: pd.DataFrame) -> pd.DataFrame:
