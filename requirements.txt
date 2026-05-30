@@ -1,41 +1,4 @@
-# Payroll Comparer
-
-A simple Streamlit app for comparing a Workday earning register against a payroll export by Employee ID.
-
-## What it does
-
-- Upload two files: `.xlsx` or `.csv`
-- Automatically detects which file is the Workday earning register and which is the payroll export
-- Aligns employees by Employee ID
-- Compares:
-  - Regular Hours
-  - Overtime Hours
-  - Hourly Rate
-  - Regular Pay
-  - Overtime Pay
-  - Total Pay
-  - Tips
-- Downloads an Excel report with only mismatches
-
-## Deploy on Streamlit Community Cloud
-
-1. Create a GitHub repo.
-2. Upload these files:
-   - `app.py`
-   - `requirements.txt`
-   - `README.md`
-3. Go to https://share.streamlit.io
-4. Click **New app**
-5. Select your repo and choose `app.py`
-6. Click **Deploy**
-
-## Run locally
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-## Note about sensitive payroll data
-
-If this will handle real payroll data, make sure your organization is comfortable with the hosting option you choose. Streamlit Community Cloud is easy, but sensitive payroll data may require a private/internal deployment.
+streamlit==1.45.1
+pandas==2.2.3
+openpyxl==3.1.5
+numpy==2.2.6
