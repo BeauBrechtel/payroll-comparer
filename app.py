@@ -237,12 +237,7 @@ def compare_summaries(workday: pd.DataFrame, toast: pd.DataFrame) -> pd.DataFram
             rows.append({
                 "Employee ID": uid,
                 "Employee Name": display_name,
-                "Mismatch Type": "Missing employee",
-                "Field": "Employee ID",
-                "Workday Value": uid,
-                "Payroll Export Value": "",
-                "Difference": "",
-                "Notes": "Employee exists in Workday file but not in payroll export file.",
+                "Field": "Missing from Payroll Export",
             })
             continue
 
@@ -250,12 +245,7 @@ def compare_summaries(workday: pd.DataFrame, toast: pd.DataFrame) -> pd.DataFram
             rows.append({
                 "Employee ID": uid,
                 "Employee Name": display_name,
-                "Mismatch Type": "Missing employee",
-                "Field": "Employee ID",
-                "Workday Value": "",
-                "Payroll Export Value": uid,
-                "Difference": "",
-                "Notes": "Employee exists in payroll export file but not in Workday file.",
+                "Field": "Missing from Workday",
             })
             continue
 
@@ -264,21 +254,15 @@ def compare_summaries(workday: pd.DataFrame, toast: pd.DataFrame) -> pd.DataFram
             right = row.get(f"{field} - Payroll Export", 0)
             left_num = 0 if pd.isna(left) else float(left)
             right_num = 0 if pd.isna(right) else float(right)
-            diff = round(left_num - right_num, 2)
 
-            if abs(diff) > 0:
+            if round(left_num, 2) != round(right_num, 2):
                 rows.append({
                     "Employee ID": uid,
                     "Employee Name": display_name,
-                    "Mismatch Type": "Value mismatch",
                     "Field": field,
-                    "Workday Value": round(left_num, 2),
-                    "Payroll Export Value": round(right_num, 2),
-                    "Difference": diff,
-                    "Notes": "",
                 })
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["Employee ID", "Employee Name", "Field"])
 
 
 def invalid_id_report(workday_invalid: pd.DataFrame, toast_invalid: pd.DataFrame) -> pd.DataFrame:
