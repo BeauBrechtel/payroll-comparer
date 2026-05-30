@@ -206,15 +206,15 @@ def standardize_toast(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     return grouped, invalid
 
 
-def compare_summaries(workday: pd.DataFrame, toast: pd.DataFrame, hour_tolerance: float, money_tolerance: float) -> pd.DataFrame:
+def compare_summaries(workday: pd.DataFrame, toast: pd.DataFrame) -> pd.DataFrame:
     compare_fields = [
-        ("Regular Hours", hour_tolerance),
-        ("Overtime Hours", hour_tolerance),
-        ("Hourly Rate", money_tolerance),
-        ("Regular Pay", money_tolerance),
-        ("Overtime Pay", money_tolerance),
-        ("Total Pay", money_tolerance),
-        ("Tips", money_tolerance),
+        "Regular Hours",
+        "Overtime Hours",
+        "Hourly Rate",
+        "Regular Pay",
+        "Overtime Pay",
+        "Total Pay",
+        "Tips",
     ]
 
     merged = workday.merge(
@@ -259,14 +259,14 @@ def compare_summaries(workday: pd.DataFrame, toast: pd.DataFrame, hour_tolerance
             })
             continue
 
-        for field, tolerance in compare_fields:
+        for field in compare_fields:
             left = row.get(f"{field} - Workday", 0)
             right = row.get(f"{field} - Payroll Export", 0)
             left_num = 0 if pd.isna(left) else float(left)
             right_num = 0 if pd.isna(right) else float(right)
             diff = round(left_num - right_num, 2)
 
-            if abs(diff) > tolerance:
+            if abs(diff) > 0:
                 rows.append({
                     "Employee ID": uid,
                     "Employee Name": display_name,
@@ -303,7 +303,7 @@ def invalid_id_report(workday_invalid: pd.DataFrame, toast_invalid: pd.DataFrame
     return pd.DataFrame(rows)
 
 
-def write_report_to_excel(mismatches: pd.DataFrame, workday_summary: pd.DataFrame, toast_summary: pd.DataFrame, invalid_ids: pd.DataFrame) -> bytes:
+def write_report_to_excel(mismatches: pd.DataFrame) -> bytes:
     output = io.BytesIO()
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -311,12 +311,6 @@ def write_report_to_excel(mismatches: pd.DataFrame, workday_summary: pd.DataFram
             pd.DataFrame([{"Result": "No mismatches found."}]).to_excel(writer, index=False, sheet_name="Mismatches")
         else:
             mismatches.to_excel(writer, index=False, sheet_name="Mismatches")
-
-        if not invalid_ids.empty:
-            invalid_ids.to_excel(writer, index=False, sheet_name="Invalid IDs")
-
-        workday_summary.to_excel(writer, index=False, sheet_name="Workday Summary")
-        toast_summary.to_excel(writer, index=False, sheet_name="Payroll Export Summary")
 
         # Simple formatting
         workbook = writer.book
@@ -338,108 +332,56 @@ def write_report_to_excel(mismatches: pd.DataFrame, workday_summary: pd.DataFram
 # UI
 # -----------------------------
 
-st.title("Payroll Comparer")
-st.write("Upload the Workday earning register and the payroll export. The app aligns employees by **Employee ID** and outputs only mismatches.")
-
-with st.expander("What this compares", expanded=False):
-    st.markdown(
-        """
-        This version is tailored to the files you provided.
-
-        **Workday Earning Register**
-        - Employee ID
-        - Regular Hourly Pay hours/pay
-        - Overtime hours/pay
-        - Rate
-        - Tips Charged
-
-        **Payroll Export**
-        - Employee ID
-        - Regular Hours
-        - Overtime Hours
-        - Hourly Rate
-        - Regular Pay
-        - Overtime Pay
-        - Total Pay
-        - Non-Cash Tips / Total Tips
-        """
-    )
+st.title("Payroll Mismatch Finder")
+st.write("Upload the two payroll files, click compare, and download the mismatch report.")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    file_a = st.file_uploader("Upload File 1 (.xlsx or .csv)", type=["xlsx", "csv"], key="file_a")
+    file_a = st.file_uploader("Upload Payroll File 1", type=["xlsx", "csv"], key="file_a")
 
 with col2:
-    file_b = st.file_uploader("Upload File 2 (.xlsx or .csv)", type=["xlsx", "csv"], key="file_b")
+    file_b = st.file_uploader("Upload Payroll File 2", type=["xlsx", "csv"], key="file_b")
 
-with st.sidebar:
-    st.header("Tolerance")
-    hour_tolerance = st.number_input("Hour difference allowed", min_value=0.0, value=0.01, step=0.01)
-    money_tolerance = st.number_input("Money/rate difference allowed", min_value=0.0, value=0.01, step=0.01)
-    st.caption("Example: 0.01 means a one-cent difference is ignored.")
+compare_clicked = st.button("Compare", type="primary", disabled=not (file_a and file_b))
 
-if file_a and file_b:
+if compare_clicked:
     try:
-        df_a, header_a = read_excel_or_csv(file_a, ["employee id", "earning", "regular hours"])
-        df_b, header_b = read_excel_or_csv(file_b, ["employee id", "earning", "regular hours"])
+        df_a, _ = read_excel_or_csv(file_a, ["employee id", "earning", "regular hours"])
+        df_b, _ = read_excel_or_csv(file_b, ["employee id", "earning", "regular hours"])
 
         type_a = detect_file_type(df_a)
         type_b = detect_file_type(df_b)
 
-        st.subheader("Detected Files")
-        st.write(f"**{file_a.name}**: {type_a.title()} format, header row {header_a}")
-        st.write(f"**{file_b.name}**: {type_b.title()} format, header row {header_b}")
-
         if {type_a, type_b} != {"workday", "toast"}:
-            st.error("I could not confidently identify one Workday earning register and one payroll export. Please check that the files match the expected formats.")
-            with st.expander("Detected columns"):
-                st.write(file_a.name, list(df_a.columns))
-                st.write(file_b.name, list(df_b.columns))
+            st.error("I could not identify one Workday earning register and one payroll export. Make sure you uploaded the correct two files.")
             st.stop()
 
         workday_df = df_a if type_a == "workday" else df_b
         toast_df = df_a if type_a == "toast" else df_b
 
-        workday_summary, workday_invalid = standardize_workday(workday_df)
-        toast_summary, toast_invalid = standardize_toast(toast_df)
+        workday_summary, _ = standardize_workday(workday_df)
+        toast_summary, _ = standardize_toast(toast_df)
 
-        mismatches = compare_summaries(workday_summary, toast_summary, hour_tolerance, money_tolerance)
-        invalid_ids = invalid_id_report(workday_invalid, toast_invalid)
+        mismatches = compare_summaries(workday_summary, toast_summary)
 
-        metric1, metric2, metric3 = st.columns(3)
-        metric1.metric("Workday employees with IDs", len(workday_summary))
-        metric2.metric("Payroll export employees with IDs", len(toast_summary))
-        metric3.metric("Mismatch rows", len(mismatches))
-
-        st.subheader("Mismatches")
         if mismatches.empty:
             st.success("No mismatches found.")
         else:
+            st.error(f"{len(mismatches)} mismatches found.")
             st.dataframe(mismatches, use_container_width=True)
 
-        if not invalid_ids.empty:
-            st.warning(f"{len(invalid_ids)} rows had blank or invalid Employee IDs and could not be aligned by UID.")
-            with st.expander("Show invalid ID rows"):
-                st.dataframe(invalid_ids, use_container_width=True)
-
-        report_bytes = write_report_to_excel(mismatches, workday_summary, toast_summary, invalid_ids)
-
-        st.download_button(
-            label="Download Mismatch Report",
-            data=report_bytes,
-            file_name="payroll_mismatch_report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-        with st.expander("Preview standardized summaries"):
-            st.write("Workday Summary")
-            st.dataframe(workday_summary, use_container_width=True)
-            st.write("Payroll Export Summary")
-            st.dataframe(toast_summary, use_container_width=True)
+            report_bytes = write_report_to_excel(mismatches)
+            st.download_button(
+                label="Download Mismatches",
+                data=report_bytes,
+                file_name="Payroll_Mismatches.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
     except Exception as exc:
-        st.error("Something went wrong while comparing the files.")
-        st.exception(exc)
-else:
+        st.error("Something went wrong while comparing the files. Make sure both files are the expected payroll exports.")
+        with st.expander("Show error details"):
+            st.exception(exc)
+elif not (file_a and file_b):
     st.info("Upload both files to begin.")
